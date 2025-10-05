@@ -91,7 +91,6 @@
                     alt="Agoda Logo Placeholder" 
                     class="rounded-lg shadow-md border border-gray-700"
                 >
-                <!-- Removed User Info Display -->
             </div>
             
             <!-- Main Title (Centered) -->
@@ -100,6 +99,12 @@
                     Note Converter
                 </h1>
                 <p class="text-gray-500 mt-1 mb-3 text-sm italic">Created by: m.ameen@agoda.com (Internal Access)</p>
+                
+                <!-- Admin Key Status/Warning -->
+                <div id="admin-key-status" class="mt-4 p-3 rounded-lg bg-gray-800 border border-gray-700 text-sm text-gray-300">
+                    <p class="text-xs text-red-400 font-bold">⚠️ Security Notice:</p>
+                    <p class="text-xs text-gray-400">This application uses a key hardcoded in the script, making it accessible to all users. Check the console for current key status.</p>
+                </div>
             </div>
         </header>
 
@@ -164,12 +169,46 @@
     </div>
 
     <script type="module">
+        // --- ADMIN API KEY CONFIGURATION ---
+        // ⚠️ IMPORTANT: FOR EXTERNAL HOSTING, PASTE YOUR KEY BELOW. 
+        // THIS KEY WILL BE PUBLICLY VISIBLE TO ALL USERS.
+        const ADMIN_GEMINI_API_KEY = "AIzaSyBhp5CXaKX0saqsObg4zoqnpsfyYHZyYM4
+ "; // <-- PASTE YOUR GEMINI API KEY HERE
+        // -----------------------------------
+        
         // --- UI ELEMENTS ---
         const statusMessageEl = document.getElementById('status-message');
         const textInput = document.getElementById('textInput');
         const abbreviationList = document.getElementById('abbreviationList');
         const abbreviateBtn = document.getElementById('abbreviateBtn');
         const expandBtn = document.getElementById('expandBtn');
+        
+        // --- API KEY HANDLING FUNCTIONS ---
+        
+        /**
+         * Returns the API key, prioritizing the hardcoded key for public access.
+         */
+        function getApiKey() {
+            // 1. Prioritize the key pasted by the administrator in the script (for public sharing).
+            if (ADMIN_GEMINI_API_KEY.trim()) {
+                return ADMIN_GEMINI_API_KEY.trim();
+            }
+            // 2. Fallback to the environment key (if running in the canvas environment)
+            // or return an empty string if neither is present.
+            return ""; 
+        }
+        
+        /**
+         * Checks the API key status and logs a warning if missing.
+         */
+        function checkApiKeyStatus() {
+            const key = getApiKey();
+            if (key) {
+                console.log("Admin API Key Detected. Application ready for external hosting.");
+            } else {
+                console.warn("API Key is missing! For external hosting (like GitHub Pages), please paste your key into the 'ADMIN_GEMINI_API_KEY' variable in the script.");
+            }
+        }
         
         // --- UTILITY FUNCTIONS ---
 
@@ -291,8 +330,13 @@
          * Handles the Expansion conversion using the Gemini API for grammar correction.
          */
         async function handleExpandConversion(text) {
+            const apiKey = getApiKey();
             if (!text.trim()) {
                 showMessage('Input text is empty. Nothing to expand.', false);
+                return;
+            }
+            if (!apiKey) {
+                showMessage('API Key is missing. Please set ADMIN_GEMINI_API_KEY in the script.', false);
                 return;
             }
 
@@ -317,7 +361,7 @@
 
                 const userQuery = `Expand and fully correct the grammar of the following abbreviated note:\n\n${originalText}`;
                 
-                const apiKey = ""; 
+                // Use the retrieved API Key
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
                 const payload = {
@@ -332,6 +376,15 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
+                
+                // Check if response is okay for key-related errors
+                if (!response.ok) {
+                    const errorDetails = await response.json();
+                    if (response.status === 400 && errorDetails.error?.message.includes('API key')) {
+                        throw new Error("Invalid API Key. Please check the key provided.");
+                    }
+                }
+
 
                 const result = await response.json();
                 const convertedText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -345,8 +398,8 @@
                 
             } catch (error) {
                 console.error("AI Expansion Error:", error);
-                textInput.value = `Error: Could not perform AI expansion and correction. The original text was: ${originalText}`;
-                showMessage('Error: Failed to expand text using AI.', false);
+                textInput.value = `Error: Could not perform AI expansion and correction. Original error: ${error.message}`;
+                showMessage(`Error: Failed to expand text. ${error.message}`, false);
             } finally {
                 setConversionLoading(false, 'expand');
             }
@@ -357,8 +410,13 @@
          * Handles the Abbreviation conversion using the Gemini API.
          */
         async function handleAbbreviateConversion(text) {
+            const apiKey = getApiKey();
             if (!text.trim()) {
                 showMessage('Input text is empty. Nothing to abbreviate.', false);
+                return;
+            }
+            if (!apiKey) {
+                showMessage('API Key is missing. Please set ADMIN_GEMINI_API_KEY in the script.', false);
                 return;
             }
 
@@ -382,7 +440,7 @@
 
                 const userQuery = `Convert the following text into a short, readable note:\n\n${text}`;
                 
-                const apiKey = ""; 
+                // Use the retrieved API Key
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
                 const payload = {
@@ -397,6 +455,14 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
+                
+                // Check if response is okay for key-related errors
+                if (!response.ok) {
+                    const errorDetails = await response.json();
+                    if (response.status === 400 && errorDetails.error?.message.includes('API key')) {
+                        throw new Error("Invalid API Key. Please check the key provided.");
+                    }
+                }
 
                 const result = await response.json();
                 const convertedText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -410,8 +476,8 @@
                 
             } catch (error) {
                 console.error("AI Abbreviation Error:", error);
-                textInput.value = `Error: Could not perform AI abbreviation. The original text was: ${originalText}`;
-                showMessage('Error: Failed to convert text using AI.', false);
+                textInput.value = `Error: Could not perform AI abbreviation. Original error: ${error.message}`;
+                showMessage(`Error: Failed to convert text. ${error.message}`, false);
             } finally {
                 setConversionLoading(false, 'abbreviate');
             }
@@ -459,8 +525,10 @@
 
 
         // --- Initialization ---
-        // Since we removed Firebase, we just initialize the abbreviation list right away.
-        window.onload = renderAbbreviations; 
+        window.onload = () => {
+            renderAbbreviations();
+            checkApiKeyStatus(); // Log key status on load
+        }; 
     </script>
 </body>
 </html>
