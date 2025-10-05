@@ -6,32 +6,54 @@
     <title>AI-Powered Abbreviation & Expansion Tool</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Set Tailwind config to use 'class' mode for dark theme handling
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {},
+            }
+        }
+    </script>
     <style>
-        /* Use Inter font and ensure high contrast black/white theme */
+        /* Base styles that apply regardless of theme */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #000000; /* Pure Black background */
-            color: #F0F0F0; /* Off-White text */
         }
         
+        /* Define theme-specific colors via Tailwind classes on body/html */
+        /* Body will be managed by classes: bg-black dark:bg-gray-100 */
+        
+        /* App Card: Dark in dark mode, White in light mode */
         .app-card {
-            background-color: #0d1117; /* Very dark grey background for dashboard container */
+            /* Fallback for body: Very dark grey background for dashboard container */
+            background-color: #0d1117; 
             border-color: #2d3748;
         }
+        /* Overridden by Tailwind: bg-gray-900 dark:bg-white */
 
         /* Custom scrollbar for the textarea and abbreviation list */
         textarea::-webkit-scrollbar, #abbreviationList::-webkit-scrollbar {
             width: 8px;
         }
-        textarea::-webkit-scrollbar-thumb {
-            background-color: #444444; /* Dark Grey scrollbar */
+        /* Dark Mode Scrollbar */
+        html.dark textarea::-webkit-scrollbar-thumb {
+            background-color: #444444; 
             border-radius: 4px;
         }
-        textarea::-webkit-scrollbar-track, #abbreviationList::-webkit-scrollbar-track {
+        html.dark textarea::-webkit-scrollbar-track, html.dark #abbreviationList::-webkit-scrollbar-track {
             background-color: #111111;
         }
-        
-        /* Styling for the abbreviation list - using flex/grid for a cleaner list */
+        /* Light Mode Scrollbar */
+        html:not(.dark) textarea::-webkit-scrollbar-thumb {
+            background-color: #ccc; 
+            border-radius: 4px;
+        }
+        html:not(.dark) textarea::-webkit-scrollbar-track, html:not(.dark) #abbreviationList::-webkit-scrollbar-track {
+            background-color: #f0f0f0;
+        }
+
+        /* Styling for the abbreviation list */
         #abbreviationList {
             max-height: 400px;
             overflow-y: auto;
@@ -39,25 +61,46 @@
         
         /* Tailwind Button Customization (Conversion Buttons) */
         .conversion-btn {
-            @apply font-bold py-3 px-4 rounded-xl shadow-lg transition duration-300 ease-in-out transform hover:scale-[1.03] active:scale-[0.98] text-white ring-4 ring-opacity-30;
+            @apply font-bold py-3 px-4 rounded-xl shadow-lg transition duration-300 ease-in-out transform hover:scale-[1.03] active:scale-[0.98] ring-4 ring-opacity-30;
+            @apply text-white; /* Text color remains white for purple buttons in both modes */
         }
         
         /* Adjusted for larger, square icon buttons (utility buttons) */
         .utility-btn {
-            @apply h-10 w-10 p-2 rounded-md shadow-md transition duration-200 ease-in-out transform hover:bg-gray-700 active:scale-[0.95] text-gray-200 flex items-center justify-center;
+            @apply h-10 w-10 p-2 rounded-md shadow-md transition duration-200 ease-in-out transform active:scale-[0.95] flex items-center justify-center;
+        }
+        .utility-btn-copy {
+            @apply bg-gray-600 dark:bg-gray-600 hover:bg-gray-500 dark:hover:bg-gray-500 text-gray-200 dark:text-gray-200;
+        }
+        .utility-btn-clear {
+            @apply bg-gray-800 dark:bg-gray-200 hover:bg-gray-700 dark:hover:bg-gray-300 text-gray-200 dark:text-gray-800;
         }
 
         /* Gradient definitions for AI buttons (Purple Theme) */
         .btn-abbreviate {
-            /* Dark Purple to Magenta */
             background-image: linear-gradient(to right, #8B5CF6, #C084FC); 
             --tw-ring-color: #8B5CF6;
         }
         .btn-expand {
-            /* Lighter Purple/Lavender to Blue-Purple */
             background-image: linear-gradient(to right, #A78BFA, #D8B4FE); 
             --tw-ring-color: #A78BFA;
         }
+
+        /* Custom style for the Agoda logo gradient */
+        .agoda-logo {
+            background-image: linear-gradient(to right, #EC4899, #F97316); 
+            color: white; 
+            font-weight: 900;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100px; 
+            height: 40px; 
+            font-size: 1rem;
+            letter-spacing: 0.1rem;
+            border-radius: 0.5rem; 
+        }
+
 
         .loading-spinner {
             border: 4px solid rgba(255, 255, 255, 0.3);
@@ -74,95 +117,97 @@
         }
     </style>
 </head>
-<body class="min-h-screen p-4 sm:p-8 flex items-start justify-center">
+<!-- Theme classes are applied to the body -->
+<body class="min-h-screen p-4 sm:p-8 flex items-start justify-center bg-black text-gray-100 dark:bg-gray-100 dark:text-gray-900 transition-colors duration-300">
 
-    <!-- Status Messages (Top Level) -->
-    <div id="status-message" class="fixed top-4 right-4 p-3 rounded-lg text-sm hidden shadow-xl"></div>
+    <!-- Temporary Status Messages (Top Right, Z-index 50) -->
+    <div id="status-message" class="fixed top-4 right-4 p-3 rounded-lg text-sm hidden shadow-xl z-50"></div>
 
-    <!-- Application Dashboard / CONVERTER (Now visible by default) -->
-    <div id="app-dashboard" class="w-full max-w-5xl app-card p-6 sm:p-10 rounded-2xl shadow-2xl shadow-gray-900/50 border">
+    <!-- Persistent AI Key Status (Top Right, fixed position, Z-index 40) -->
+    <div id="admin-key-status" class="fixed top-4 sm:top-6 right-4 sm:right-8 p-2 rounded-lg border text-xs shadow-2xl z-40 max-w-[250px] transition-colors duration-300">
+        <!-- Status message will be updated by JavaScript -->
+        <p id="key-status-text" class="font-medium"></p>
+    </div>
+
+    <!-- Application Dashboard / CONVERTER -->
+    <!-- Applying dual-mode classes to app-card -->
+    <div id="app-dashboard" class="w-full max-w-5xl app-card p-6 sm:p-10 rounded-2xl shadow-2xl shadow-gray-900/50 dark:shadow-gray-300/50 border bg-gray-900 dark:bg-white border-gray-700 dark:border-gray-300 transition-colors duration-300">
         
         <!-- Header -->
         <header class="mb-8">
             <!-- AGODA LOGO (Top Left) -->
             <div class="flex items-center justify-between mb-6">
-                <img 
-                    src="https://placehold.co/100x40/000000/FFFFFF?text=AGODA" 
-                    alt="Agoda Logo Placeholder" 
-                    class="rounded-lg shadow-md border border-gray-700"
+                <!-- Logo -->
+                <div 
+                    class="agoda-logo shadow-md border border-gray-700 dark:border-gray-300"
                 >
+                    AGODA
+                </div>
+
+                <!-- Theme Toggle -->
+                <button id="themeToggle" class="utility-btn utility-btn-clear h-12 w-12" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+                    <!-- Default: Moon (Dark Mode) - Swapped by JS for Light Mode -->
+                    <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-moon transition-all duration-300"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                    <svg id="sunIcon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sun transition-all duration-300 hidden"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+                </button>
             </div>
             
             <!-- Main Title (Centered) -->
             <div class="text-center">
-                <h1 class="text-4xl sm:text-5xl font-extrabold text-white">
+                <h1 class="text-4xl sm:text-5xl font-extrabold text-white dark:text-gray-900 transition-colors duration-300">
                     Note Converter
                 </h1>
-                <p class="text-gray-500 mt-1 mb-3 text-sm italic">Created by: m.ameen@agoda.com (Internal Access)</p>
-                
-                <!-- Admin Key Status/Warning -->
-                <div id="admin-key-status" class="mt-4 p-3 rounded-xl border">
-                    <!-- Status message will be updated by JavaScript -->
-                    <p id="key-status-text" class="text-sm font-medium"></p>
-                </div>
+                <p class="text-gray-500 dark:text-gray-500 mt-1 mb-3 text-sm italic">Created by: m.ameen@agoda.com (Internal Access)</p>
             </div>
         </header>
 
-        <!-- Grid Container for Input (40% width) and AI Buttons (60% width) -->
-        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
+        <!-- UI FIX: Combined Container for Input and Controls, centered and width constrained -->
+        <div class="flex flex-col gap-6 mb-8 w-full max-w-xl mx-auto"> 
             
-            <!-- Left Column: Text Input (40% width) -->
-            <div class="lg:col-span-2">
+            <!-- 1. Text Input Area -->
+            <div>
                 <div class="relative">
-                    <label for="textInput" class="block text-lg font-medium text-gray-300 mb-2">Input Text / Abbreviated Note</label>
+                    <label for="textInput" class="block text-lg font-medium text-gray-300 dark:text-gray-700 mb-2 transition-colors duration-300">Input Text / Abbreviated Note</label>
                     
                     <!-- Utility Icons Container: Absolute position top-right -->
                     <div id="utilityIcons" class="absolute right-0 top-0 flex space-x-2">
                         <!-- Clear Text Button (Icon only) -->
-                        <button onclick="clearText()" class="utility-btn bg-gray-800 hover:bg-gray-600" title="Clear Input Text">
-                            <!-- Trash/Clear Icon -->
+                        <button onclick="clearText()" class="utility-btn utility-btn-clear" title="Clear Input Text">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M15 6V4c0-1-1-2-2-2h-2c-1 0-2 1-2 2v2"/></svg>
                         </button>
 
                         <!-- Copy Note Button (Icon only) -->
-                        <button onclick="copyToClipboard()" class="utility-btn bg-gray-600 hover:bg-gray-500" title="Copy Note to Clipboard">
-                            <!-- Copy Icon -->
+                        <button onclick="copyToClipboard()" class="utility-btn utility-btn-copy" title="Copy Note to Clipboard">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                         </button>
                     </div>
                     
                     <textarea
                         id="textInput"
-                        rows="12"
+                        rows="12" 
                         placeholder="Paste your full sentence or your abbreviated note here..."
-                        class="w-full p-4 text-xl bg-gray-900 text-gray-100 border border-gray-700 rounded-xl focus:ring-gray-500 focus:border-gray-500 ring-2 ring-transparent focus:ring-4 transition duration-200 resize-none mt-2"
+                        class="w-full p-4 text-xl bg-gray-900 text-gray-100 border border-gray-700 rounded-xl focus:ring-gray-500 dark:bg-gray-100 dark:text-gray-900 dark:border-gray-400 dark:focus:ring-gray-400 focus:border-gray-500 ring-2 ring-transparent focus:ring-4 transition duration-200 resize-none mt-2"
                         spellcheck="false"
                     ></textarea>
                 </div>
             </div>
 
-            <!-- Right Column: AI Buttons (60% width, stacked vertically and centered) -->
-            <div class="lg:col-span-3 flex flex-col gap-4 items-center justify-center">
-                
-                <!-- AI Conversion Buttons - Reduced width and rounded-xl -->
-                <button id="abbreviateBtn" onclick="convertTo('abbreviate')" class="conversion-btn btn-abbreviate ring-violet-500/50 flex items-center justify-center max-w-xs w-full">
+            <!-- 2. AI Buttons (Side-by-Side) -->
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <button id="abbreviateBtn" onclick="convertTo('abbreviate')" class="conversion-btn btn-abbreviate ring-violet-500/50 flex-1 flex items-center justify-center">
                     Abbreviate (AI)
                 </button>
-                <button id="expandBtn" onclick="convertTo('expand')" class="conversion-btn btn-expand ring-purple-400/50 flex items-center justify-center max-w-xs w-full">
+                <button id="expandBtn" onclick="convertTo('expand')" class="conversion-btn btn-expand ring-purple-400/50 flex-1 flex items-center justify-center">
                     Expand Text (AI)
                 </button>
-                
-                <!-- Spacing (Keeping a divider here to separate AI from input) -->
-                <div class="border-t border-gray-800 my-2 lg:hidden"></div>
-
             </div>
         </div>
 
         <!-- Abbreviation Reference Section -->
-        <div class="mt-12 pt-8 border-t border-gray-800">
-            <h2 class="text-xl font-semibold text-white mb-3">Abbreviation Dictionary Reference</h2>
-            <p class="text-gray-400 mb-4 text-sm">This dictionary guides the AI. <span class="text-gray-400 font-bold border-b border-gray-400 italic">Typos</span> and <span class="text-gray-500 font-bold italic">Synonyms</span> are highlighted by styling, not color.</p>
-            <div id="abbreviationList" class="bg-gray-900 p-4 rounded-xl text-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3 shadow-inner border border-gray-800">
+        <div class="mt-12 pt-8 border-t border-gray-800 dark:border-gray-300 transition-colors duration-300">
+            <h2 class="text-xl font-semibold text-white dark:text-gray-900 mb-3 transition-colors duration-300">Abbreviation Dictionary Reference</h2>
+            <p class="text-gray-400 dark:text-gray-500 mb-4 text-sm">This dictionary guides the AI. <span class="text-gray-400 dark:text-gray-600 font-bold border-b border-gray-400 dark:border-gray-600 italic">Typos</span> and <span class="text-gray-500 dark:text-gray-600 font-bold italic">Synonyms</span> are highlighted by styling, not color.</p>
+            <div id="abbreviationList" class="bg-gray-900 dark:bg-gray-100 p-4 rounded-xl text-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3 shadow-inner border border-gray-800 dark:border-gray-300">
                 <!-- Abbreviations loaded by JS will go here -->
             </div>
         </div>
@@ -184,6 +229,59 @@
         const keyStatusEl = document.getElementById('admin-key-status');
         const keyStatusTextEl = document.getElementById('key-status-text');
         
+        // Theme toggle icons
+        const htmlElement = document.documentElement;
+        const sunIcon = document.getElementById('sunIcon');
+        const moonIcon = document.getElementById('moonIcon');
+
+        // --- THEME FUNCTIONS ---
+
+        /**
+         * Sets the theme based on the preference (dark or light) and saves it to localStorage.
+         */
+        function setTheme(theme) {
+            if (theme === 'dark') {
+                htmlElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                moonIcon.classList.remove('hidden');
+                sunIcon.classList.add('hidden');
+            } else {
+                htmlElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+            }
+        }
+
+        /**
+         * Toggles the current theme.
+         */
+        window.toggleTheme = function() {
+            if (htmlElement.classList.contains('dark')) {
+                setTheme('light');
+            } else {
+                setTheme('dark');
+            }
+        }
+
+        /**
+         * Initializes the theme from localStorage or system preference.
+         */
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+            if (savedTheme) {
+                setTheme(savedTheme);
+            } else if (prefersDark) {
+                // If no preference saved, use system preference (set to dark by default)
+                setTheme('dark');
+            } else {
+                // Default to dark mode if no preference found
+                setTheme('dark');
+            }
+        }
+
         // --- API KEY HANDLING FUNCTIONS ---
         
         /**
@@ -205,12 +303,12 @@
             const key = getApiKey();
             if (key) {
                 keyStatusTextEl.textContent = "AI Service Active: Admin API Key is loaded and ready.";
-                keyStatusEl.classList.remove('border-red-600', 'bg-red-900/30');
-                keyStatusEl.classList.add('border-green-600', 'bg-green-900/30');
+                keyStatusEl.classList.remove('border-red-600', 'bg-red-900/30', 'text-red-400');
+                keyStatusEl.classList.add('border-green-600', 'bg-green-900/30', 'text-green-400');
             } else {
-                keyStatusTextEl.innerHTML = 'AI Service **INACTIVE**: Please paste your Gemini API Key into the script to enable the buttons.';
-                keyStatusEl.classList.remove('border-green-600', 'bg-green-900/30');
-                keyStatusEl.classList.add('border-red-600', 'bg-red-900/30');
+                keyStatusTextEl.innerHTML = 'AI Service <span class="font-bold text-red-400">INACTIVE</span>: Paste Key in script to enable buttons.';
+                keyStatusEl.classList.remove('border-green-600', 'bg-green-900/30', 'text-green-400');
+                keyStatusEl.classList.add('border-red-600', 'bg-red-900/30', 'text-red-400');
             }
         }
         
@@ -237,20 +335,27 @@
         // --- CONVERTER APPLICATION LOGIC ---
         
         // Lists for UI highlighting only
-        const typoTerms = ["Custumer", "Cancllation", "Reservtion", "Pleas"];
+        const typoTerms = ["Custumer", "Cancllation", "Reservtion", "Pleas", "Receieve", "Wating", "Managment", "Complain"];
         const synonymTerms = [
-            "User", "Client", "Patron", "Booker", "Traveller", "Visitor", "Occupant", "Lodger", // PAX synonyms
-            "Stay", "Confirmed Stay", "Travel Plan", "Order", "Booked Room", "Lodging", // RSVN synonyms
-            "Voiding", "Withdrawal", "Dropping", "Terminate", "Annulment", // CXL synonyms
-            "Reimbursement", "Credit", "Money Back", "Repayment", "Return Payment", "Return funds", // RFND synonyms
-            "Inn", "Motel", "Hostel", "Lodge", "Accommodation", "Residence", // HTL synonyms
+            "User", "Client", "Patron", "Booker", "Traveller", "Visitor", "Occupant", "Lodger", "Individual", // PAX synonyms
+            "Stay", "Confirmed Stay", "Travel Plan", "Order", "Booked Room", "Lodging", "Accommodation", // RSVN synonyms
+            "Voiding", "Withdrawal", "Dropping", "Terminate", "Annulment", "Abolish", "Revoke", // CXL synonyms
+            "Reimbursement", "Credit", "Money Back", "Repayment", "Return Payment", "Return funds", "Funds", // RFND synonyms
+            "Inn", "Motel", "Hostel", "Lodge", "Residence", // HTL synonyms
             "Establishment", "Premises", "Venue", "Site", "Building", // PPTY synonyms
-            "Check In", "Revert", "Respond", "Get Back", "Update" // F/U synonyms
+            "Check In", "Revert", "Respond", "Get Back", "Update", "Check back", "Review", // F/U synonyms
+            "Difficulty", "Complaint", // PROB synonyms
+            "Verification", // CFM synonym
+            "Endorse", // APV synonym
+            "Price", "Cost", // AMT synonyms
+            "Next Day", // TMR synonym
+            "Entering", // ARR synonym
+            "Leaving" // C/O synonym
         ];
 
         // --- AGODA ABBREVIATION DICTIONARY (kept for reference) ---
         const abbreviationMap = {
-            "1 night": "1N", "1 room, 2 adults, 1 child": "1R 2A 1C", "Air conditioning": "A/C", "American Breakfast": "ABF", "Agoda Better Price": "ABP", "Accordingly": "ACC", "Acknowledge(d)": "ACK", "Accept": "ACPT", "Advertisement": "AD", "Additional": "ADD", "Address": "ADDR", "Advise(d)": "ADV", "Alternative": "ALT", "Approve": "APV", "Amend(ed)": "AMD", "Amendment": "AMD", "Amount": "AMT", "Approximately": "APPROX", "Apartment": "APT", "Acquirer Reference Number": "ARN", "Arrive(d)": "ARR", "Arrival": "ARR", "As soon as possible": "ASAP", "Airport Transfer": "ATF", "Account Takeover": "AT", "Authorize": "AUTH", "Available": "AVAIL", "Account holder": "AH", "Alternative Payment Methods": "APM", "Athena - Accommodation - Athena Wizard": "AW", "Because": "B/C", "Blacklist": "B/L", "Backend": "BE", "Breakfast": "BF", "Booking": "BKG", "Booking.com outbound agent/team": "BOT", "Bank Statement": "BS", "Bank Transfer": "BT", "Bank Transfer Form": "BTF", "Communications": "COMMS", "Check in": "C/I", "Check out": "C/O", "Chargeback": "CB", "Credit Card": "CC", "Corporate Credit Card": "CORP CC", "Confirm(ed)": "CFM", "Chat": "CH", "Child": "CHD", "Change(d)": "CHG", "Credit Card On file": "CCOF", "Customer Service": "CS", "Customer Service Department": "CS", "Contact(ed)": "CTC", "Cancel": "CXL", "Cancel(ed)": "CXL", "Cancellation": "CXL", "Cancllation": "CXL", "Cancellation Fee Waiver Tool": "CFWT", "Collect": "COLL", "Conversation": "CONVO", "Canned Response": "CR", "Double Room": "DBL", "Department": "DEPT", "Different": "DIFF", "Difference": "DIFF", "Documentation": "DOC", "Document": "DOC", "Detail": "DTL", "Duplicate": "DUP", "Dedicated": "Ded.", "Non-dedicated": "Non-ded.", "Example": "E.G.", "Extra Bed": "EXB", "Educate": "EDU", "E-mail": "EML", "Email": "EML", "Enquire(d)": "ENQ", "Enquiry": "ENQ", "End of Business day": "EOB", "End of Shift": "EOS", "Escalate(d)": "ESC", "Escalation": "ESC", "Estimated Time of Arrival": "ETA", "Estimated Time of Departure": "ETD", "Exclude(d)": "EXCL", "Excluding": "EXCL", "Extension number": "EXT", "Follow Up": "F/U", "Fully Booked": "FB", "Front Desk": "FD", "Flight": "FLT", "Free of charge": "FOC", "Forward(ed)": "FWD", "Foreign exchange": "FX", "For Your Information": "FYI", "Gesture of goodwill": "GOG", "Guaranteed": "GTD", "Go to Travel Campaign": "GTT", "Hotel": "HTL", "Inn": "HTL", "Motel": "HTL", "Hostel": "HTL", "Lodge": "HTL", "Accommodation": "HTL", "Residence": "HTL", "Hotel voucher": "HTVC", "Hotel confirmation number": "HCN", "Hotelbeds": "HTB", "Hotelbeds Interface": "HTBIF", "Hour": "Hr", "Hours": "Hrs", "In Other Words": "I.E.", "Inbound": "IB", "In-House": "IH", "Inform(ed)": "IFM", "Information": "Info", "Immediate": "IMM", "Include(d)": "INCL", "Including": "INCL", "Inquire(d)": "INQ", "Inquiry": "INQ", "Installment": "INSTL", "International": "INTL", "Internal": "INT", "International transaction fee": "ITF", "Instagram": "IG", "Language Barrier": "LB", "Lead Guest": "LG", "Length of Stay": "LOS", "Medical Certificate": "MC", "Memo Random": "Memo", "Manager": "MGR", "Management": "MGT", "Manage My Booking": "MMB", "Minute": "MIN", "Minutes": "MINS", "Message": "MSG", "Messaging": "MSG", "Marketing": "Mktg", "Monitor by Walking Around": "MBWA", "Night": "N", "Not available": "N/A", "Negotiate": "NEGOT", "negotiation": "NEGOT", "No Further Action": "NFA", "Number": "NO.", "No Show": "NS", "Non Touch Point": "NTP", "Outbound": "OB", "Occupancy": "OCC", "Okay": "OK", "Online Travel Agency": "OTA", "Original": "ORIG", "Customer": "PAX", "Guest": "PAX", "Custumer": "PAX", "User": "PAX", "Client": "PAX", "Patron": "PAX", "Booker": "PAX", "Traveller": "PAX", "Visitor": "PAX", "Occupant": "PAX", "Lodger": "PAX", "Pending Case Automation": "PCA", "Price Freeze": "PF", "Package": "PKG", "Person in charge": "PIC", "Please": "PLS", "Pleas": "PLS", "Policy": "POL", "Period of Stay": "POS", "Possible": "POSS", "Per Person": "PP", "People": "PPL", "Previous": "PREV", "Problem": "PROB", "Promotion": "PROMO", "Promotional": "PROMO", "Property": "PPTY", "Establishment": "PPTY", "Premises": "PPTY", "Venue": "PPTY", "Site": "PPTY", "Building": "PPTY", "Per Room Per Night": "PRPN", "Points": "PTS", "Password": "PW", "Partnership": "P'ship", "Quadruple Room": "QUAD", "Receive(d)": "RCV", "Relevant Department": "RD", "Reconfirm(ed)": "RECFM", "Reference": "REF", "Regarding": "REG", "Request(ed)": "REQ", "Refund(ed)": "RFND", "Reimbursement": "RFND", "Credit": "RFND", "Money Back": "RFND", "Repayment": "RFND", "Return Payment": "RFND", "Return funds": "RFND", "Non-Refundable": "NON-RFND", "Room": "RM", "Reservation": "RSVN", "Reservtion": "RSVN", "Stay": "RSVN", "Confirmed Stay": "RSVN", "Travel Plan": "RSVN", "Order": "RSVN", "Booked Room": "RSVN", "Lodging": "RSVN", "Room type": "RT", "Supporting document": "SD", "Single Room": "SGL", "Secure link": "SL", "Standard Operation Procedure": "SOP", "Special request": "SR", "Smart Search": "SS", "Screenshot": "SS", "Standard Room": "STD", "Supplier": "SUPP", "To Be Advised": "TBA", "Telephone": "TEL", "Through": "THRU", "Tomorrow": "TMR", "Triple Room": "TRP", "Twin Room": "TWN", "Timezone": "TZ", "Travel Operations Back Office": "TOBO", "Transaction": "TXN", "Voucher": "VC", "Voicemail": "VM", "Voice message": "VM", "Voice": "VO", "Validate": "VLDT", "With": "W/", "Within": "W/I", "Whitelist": "W/L", "Without": "W/O", "Years old": "Y. O.", "Allotment Alert": "AA", "Athena Messaging": "ATM", "Avaya Aura Agent Desktop": "AAAD", "Agent Assisted Booking": "AAB", "Awaiting Customer Response": "ACR", "Arabic": "AE", "American Express": "AMEX", "Agoda Private Sale": "APS", "Allotment Reject": "AR", "Auxiliary": "AUX", "AgodaCash": "AC", "Agent Initiated Monitoring": "AIM", "Accommodation Service Team": "AST", "Average Handling Time": "AHT", "Agoda Special Offers": "ASO", "Booking.com": "B.COM", "Business to Business": "B2B", "Business to Customer": "B2C", "Business assurance team": "BA", "Business Development": "BD", "Booking Identification Number": "BID", "Bangkok": "BKK", "Book Now Pay on Check in": "BNPC", "Book Now Pay Later": "BNPL", "Book on Request": "BOR", "Best price guarantee": "BPG", "Agoda price guarantee": "BPG", "Budapest": "BUD", "Bank Identification Number": "BIN", "Backoffice": "BO", "Business Process, Risk and Control dept.": "BPRC", "Backoffice Allotment Reject": "BAR", "Click to Call": "C2C", "Click to Email": "C2EM", "Cashback Rewards": "CBRW", "Csat and Escalation teams": "CED", "Customer Experience Group": "CEG", "Contact ID": "CID", "Mandarin": "CN", "Customer Relation Management": "CRM", "Customer satisfaction": "CSAT", "Credit card security code": "CVV/CVC", "Customer Satisfaction and Incidents Team": "CSI", "Call Back Request": "CBR", "Continue Internal Call": "CIC", "Direct Connect non-Yield Control System": "DC non-YCS", "Day": "D", "Dynamic Currency Conversion": "DCC", "German": "DE", "Disconnect(ed)": "DISC", "Destination Management Company": "DMC", "CN Domestic Team": "DOM", "Direct Message": "DM", "Enterprise Booking Engine": "EBE", "English": "EN", "Email per hour": "EPH", "Spanish": "ES", "Frequently Asked Questions": "FAQ", "First Contact Resolution": "FCR", "Finance Team": "FIN", "Fast Track": "FT", "Foreign Languages": "FL", "Asian foreign languages": "FLA", "European foreign languages": "FLEU", "French": "FR", "Foundation back office": "FBO", "Global Collect": "GC", "Greenwich Mean Time": "GMT", "Go To My Booking": "GTMB", "Grave yard shift team": "GY", "Cantonese": "HK", "Hotels Team": "HOT", "Human Resource": "HR", "Hungarian": "HU", "Hyperwallet": "HW", "Hotel ID": "HID", "Property ID": "HID", "Inbound Pax Touchpoint(s)": "IBPTP", "Identification Number": "ID", "Indonesian": "ID", "Interaction Search": "IS", "Italian": "IT", "Information Technology": "IT", "Interactive Voice Response System": "IVR", "Internal Line Closed": "ILC", "Japan Credit Bureau": "JCB", "Japanese": "JP", "Key Performance Indicator": "KPI", "Korean": "KR", "Kuala Lumpur": "KUL", "Korean Consumer Agency": "KCA", "Last Minute Booking": "LMB", "Local Price": "LP", "Net Inclusive Rate": "LP", "LanguageLine Support": "LLS", "Market Manager": "MM", "Malay": "MY", "Manual Review Box": "MRB", "Malaysia Tourism Tax": "MTTX", "Net Promoter Score": "NPS", "Negative Commission": "NC", "Natural disaster": "ND", "Non Web Collect": "NWC", "Online Training": "OLT", "Operations": "OPS", "Over Time": "OT", "Office of The Consumer Protection Board": "OCPB", "Original Booking Value": "OBV", "Outlook Email Task": "OET", "Offline Payment": "OTC", "Over The Counter Payment": "OTC", "Payment Card Industry Data Security": "PCI-Compliance", "Priceline": "PCLN", "Predefined Content": "PDC", "Public Holiday": "PH", "Payment Team": "PMT", "Payment": "PMT", "Proof of Concept": "POC", "Partner Services": "PS", "Portuguese": "PT", "Providence": "PVD", "PCFW": "PCFW", "Private Message": "PM", "Personal Follow up": "PFU", "Questions and Answers": "Q&A", "Quality Assurance": "QA", "Quick Services": "QS", "Rebook": "RB", "Rewards Backoffice": "RBO", "Refund Request Form": "RRF", "Russian": "RU", "Agoda Website Structure": "ROH", "Reclame Aqui": "REAQ", "Real Time Specialist": "RTS", "Sao Paulo": "SAO", "Shift Coordinator": "SC", "Single Contact Resolution": "SCR", "Specially Designated Nationals": "SDN", "Seoul": "SEL", "Singapore": "SG", "Shanghai": "SHG", "Service Level Agreement": "SLA", "Selling Price": "SP", "Self Service Cancellation Fee Waiver": "SSFW", "Smart Service Identification Number": "SSID", "Specialized Support Team": "SST", "SuperAggregator": "SuperAgg", "Social Media": "SM", "Sharepoint Escalation Task": "SPT", "Sprinklr Case For Social Media Team": "SPK", "Terms & Conditions": "T&C", "Travel Agent": "TA", "Turn around time": "TAT", "Team Captain": "TC", "Thai": "TH", "Team Leader": "TL", "Team Manager": "TM", "Travel Operations": "TO", "Touch point": "TP", "Touch point per day": "TPD", "Touch point per hour": "TPH", "Escalation to TM/ TC": "TME", "Taobao Fliggy Chat": "TFC", "TM/TC assignment": "TMA", "TeQuejaSuma": "TQS", "Time to first response": "TTFR", "Unique Purchasing Card": "UPC", "Universal Resource Locator": "URL", "Urgent Last Minute Booking": "URLMB", "Unique Contact ID": "UCID", "Virtual Classroom Training": "VCT", "Vietnamese": "VN", "Voice per hour": "VPH", "Work Force Management": "WFM", "Working Day(s)": "WD", "World Pay": "WP", "World Wide Web": "WWW", "Walk-in Customer": "WIC", "Work Breakdown Structure": "WBS", "Extensible Markup Language": "XML", "Yield Control System": "YCS", "Yokohama": "YOK", "Voiding": "CXL", "Withdrawal": "CXL", "Dropping": "CXL", "Terminate": "CXL", "Annulment": "CXL", "Check In": "F/U", "Revert": "F/U", "Respond": "F/U", "Get Back": "F/U", "Update": "F/U"
+            "1 night": "1N", "1 room, 2 adults, 1 child": "1R 2A 1C", "Air conditioning": "A/C", "American Breakfast": "ABF", "Agoda Better Price": "ABP", "Accordingly": "ACC", "Acknowledge(d)": "ACK", "Accept": "ACPT", "Advertisement": "AD", "Additional": "ADD", "Address": "ADDR", "Advise(d)": "ADV", "Alternative": "ALT", "Approve": "APV", "Endorse": "APV", "Amend(ed)": "AMD", "Amendment": "AMD", "Amount": "AMT", "Price": "AMT", "Cost": "AMT", "Approximately": "APPROX", "Apartment": "APT", "Acquirer Reference Number": "ARN", "Arrive(d)": "ARR", "Arrival": "ARR", "Entering": "ARR", "As soon as possible": "ASAP", "Airport Transfer": "ATF", "Account Takeover": "AT", "Authorize": "AUTH", "Available": "AVAIL", "Account holder": "AH", "Alternative Payment Methods": "APM", "Athena - Accommodation - Athena Wizard": "AW", "Because": "B/C", "Blacklist": "B/L", "Backend": "BE", "Breakfast": "BF", "Booking": "BKG", "Booking.com outbound agent/team": "BOT", "Bank Statement": "BS", "Bank Transfer": "BT", "Bank Transfer Form": "BTF", "Communications": "COMMS", "Check in": "C/I", "Check out": "C/O", "Leaving": "C/O", "Chargeback": "CB", "Credit Card": "CC", "Corporate Credit Card": "CORP CC", "Confirm(ed)": "CFM", "Verification": "CFM", "Chat": "CH", "Child": "CHD", "Change(d)": "CHG", "Credit Card On file": "CCOF", "Customer Service": "CS", "Customer Service Department": "CS", "Contact(ed)": "CTC", "Cancel": "CXL", "Cancel(ed)": "CXL", "Cancellation": "CXL", "Cancllation": "CXL", "Voiding": "CXL", "Withdrawal": "CXL", "Dropping": "CXL", "Terminate": "CXL", "Annulment": "CXL", "Abolish": "CXL", "Revoke": "CXL", "Cancellation Fee Waiver Tool": "CFWT", "Collect": "COLL", "Conversation": "CONVO", "Canned Response": "CR", "Double Room": "DBL", "Department": "DEPT", "Different": "DIFF", "Difference": "DIFF", "Documentation": "DOC", "Document": "DOC", "Detail": "DTL", "Duplicate": "DUP", "Dedicated": "Ded.", "Non-dedicated": "Non-ded.", "Example": "E.G.", "Extra Bed": "EXB", "Educate": "EDU", "E-mail": "EML", "Email": "EML", "Enquire(d)": "ENQ", "Enquiry": "ENQ", "End of Business day": "EOB", "End of Shift": "EOS", "Escalate(d)": "ESC", "Escalation": "ESC", "Estimated Time of Arrival": "ETA", "Estimated Time of Departure": "ETD", "Exclude(d)": "EXCL", "Excluding": "EXCL", "Extension number": "EXT", "Follow Up": "F/U", "Check back": "F/U", "Review": "F/U", "Fully Booked": "FB", "Front Desk": "FD", "Flight": "FLT", "Free of charge": "FOC", "Forward(ed)": "FWD", "Foreign exchange": "FX", "For Your Information": "FYI", "Gesture of goodwill": "GOG", "Guaranteed": "GTD", "Go to Travel Campaign": "GTT", "Hotel": "HTL", "Inn": "HTL", "Motel": "HTL", "Hostel": "HTL", "Lodge": "HTL", "Accommodation": "HTL", "Residence": "HTL", "Hotel voucher": "HTVC", "Hotel confirmation number": "HCN", "Hotelbeds": "HTB", "Hotelbeds Interface": "HTBIF", "Hour": "Hr", "Hours": "Hrs", "In Other Words": "I.E.", "Inbound": "IB", "In-House": "IH", "Inform(ed)": "IFM", "Information": "Info", "Immediate": "IMM", "Include(d)": "INCL", "Including": "INCL", "Inquire(d)": "INQ", "Inquiry": "INQ", "Installment": "INSTL", "International": "INTL", "Internal": "INT", "International transaction fee": "ITF", "Instagram": "IG", "Language Barrier": "LB", "Lead Guest": "LG", "Length of Stay": "LOS", "Medical Certificate": "MC", "Memo Random": "Memo", "Manager": "MGR", "Management": "MGT", "Manage My Booking": "MMB", "Minute": "MIN", "Minutes": "MINS", "Message": "MSG", "Messaging": "MSG", "Marketing": "Mktg", "Monitor by Walking Around": "MBWA", "Night": "N", "Not available": "N/A", "Negotiate": "NEGOT", "negotiation": "NEGOT", "No Further Action": "NFA", "Number": "NO.", "No Show": "NS", "Non Touch Point": "NTP", "Outbound": "OB", "Occupancy": "OCC", "Okay": "OK", "Online Travel Agency": "OTA", "Original": "ORIG", "Customer": "PAX", "Guest": "PAX", "Custumer": "PAX", "User": "PAX", "Client": "PAX", "Patron": "PAX", "Booker": "PAX", "Traveller": "PAX", "Visitor": "PAX", "Occupant": "PAX", "Lodger": "PAX", "Individual": "PAX", "Pending Case Automation": "PCA", "Price Freeze": "PF", "Package": "PKG", "Person in charge": "PIC", "Please": "PLS", "Pleas": "PLS", "Policy": "POL", "Period of Stay": "POS", "Possible": "POSS", "Per Person": "PP", "People": "PPL", "Previous": "PREV", "Problem": "PROB", "Difficulty": "PROB", "Complaint": "PROB", "Promotion": "PROMO", "Promotional": "PROMO", "Property": "PPTY", "Establishment": "PPTY", "Premises": "PPTY", "Venue": "PPTY", "Site": "PPTY", "Building": "PPTY", "Per Room Per Night": "PRPN", "Points": "PTS", "Password": "PW", "Partnership": "P'ship", "Quadruple Room": "QUAD", "Receive(d)": "RCV", "Relevant Department": "RD", "Reconfirm(ed)": "RECFM", "Reference": "REF", "Regarding": "REG", "Request(ed)": "REQ", "Refund(ed)": "RFND", "Reimbursement": "RFND", "Credit": "RFND", "Money Back": "RFND", "Repayment": "RFND", "Return Payment": "RFND", "Return funds": "RFND", "Funds": "RFND", "Non-Refundable": "NON-RFND", "Room": "RM", "Reservation": "RSVN", "Reservtion": "RSVN", "Stay": "RSVN", "Confirmed Stay": "RSVN", "Travel Plan": "RSVN", "Order": "RSVN", "Booked Room": "RSVN", "Lodging": "RSVN", "Room type": "RT", "Supporting document": "SD", "Single Room": "SGL", "Secure link": "SL", "Standard Operation Procedure": "SOP", "Special request": "SR", "Smart Search": "SS", "Screenshot": "SS", "Standard Room": "STD", "Supplier": "SUPP", "To Be Advised": "TBA", "Telephone": "TEL", "Through": "THRU", "Tomorrow": "TMR", "Next Day": "TMR", "Triple Room": "TRP", "Twin Room": "TWN", "Timezone": "TZ", "Travel Operations Back Office": "TOBO", "Transaction": "TXN", "Voucher": "VC", "Voicemail": "VM", "Voice message": "VM", "Voice": "VO", "Validate": "VLDT", "With": "W/", "Within": "W/I", "Whitelist": "W/L", "Without": "W/O", "Years old": "Y. O.", "Allotment Alert": "AA", "Athena Messaging": "ATM", "Avaya Aura Agent Desktop": "AAAD", "Agent Assisted Booking": "AAB", "Awaiting Customer Response": "ACR", "Arabic": "AE", "American Express": "AMEX", "Agoda Private Sale": "APS", "Allotment Reject": "AR", "Auxiliary": "AUX", "AgodaCash": "AC", "Agent Initiated Monitoring": "AIM", "Accommodation Service Team": "AST", "Average Handling Time": "AHT", "Agoda Special Offers": "ASO", "Booking.com": "B.COM", "Business to Business": "B2B", "Business to Customer": "B2C", "Business assurance team": "BA", "Business Development": "BD", "Booking Identification Number": "BID", "Bangkok": "BKK", "Book Now Pay on Check in": "BNPC", "Book Now Pay Later": "BNPL", "Book on Request": "BOR", "Best price guarantee": "BPG", "Agoda price guarantee": "BPG", "Budapest": "BUD", "Bank Identification Number": "BIN", "Backoffice": "BO", "Business Process, Risk and Control dept.": "BPRC", "Backoffice Allotment Reject": "BAR", "Click to Call": "C2C", "Click to Email": "C2EM", "Cashback Rewards": "CBRW", "Csat and Escalation teams": "CED", "Customer Experience Group": "CEG", "Contact ID": "CID", "Mandarin": "CN", "Customer Relation Management": "CRM", "Customer satisfaction": "CSAT", "Credit card security code": "CVV/CVC", "Customer Satisfaction and Incidents Team": "CSI", "Call Back Request": "CBR", "Continue Internal Call": "CIC", "Direct Connect non-Yield Control System": "DC non-YCS", "Day": "D", "Dynamic Currency Conversion": "DCC", "German": "DE", "Disconnect(ed)": "DISC", "Destination Management Company": "DMC", "CN Domestic Team": "DOM", "Direct Message": "DM", "Enterprise Booking Engine": "EBE", "English": "EN", "Email per hour": "EPH", "Spanish": "ES", "Frequently Asked Questions": "FAQ", "First Contact Resolution": "FCR", "Finance Team": "FIN", "Fast Track": "FT", "Foreign Languages": "FL", "Asian foreign languages": "FLA", "European foreign languages": "FLEU", "French": "FR", "Foundation back office": "FBO", "Global Collect": "GC", "Greenwich Mean Time": "GMT", "Go To My Booking": "GTMB", "Grave yard shift team": "GY", "Cantonese": "HK", "Hotels Team": "HOT", "Human Resource": "HR", "Hungarian": "HU", "Hyperwallet": "HW", "Hotel ID": "HID", "Property ID": "HID", "Inbound Pax Touchpoint(s)": "IBPTP", "Identification Number": "ID", "Indonesian": "ID", "Interaction Search": "IS", "Italian": "IT", "Information Technology": "IT", "Interactive Voice Response System": "IVR", "Internal Line Closed": "ILC", "Japan Credit Bureau": "JCB", "Japanese": "JP", "Key Performance Indicator": "KPI", "Korean": "KR", "Kuala Lumpur": "KUL", "Korean Consumer Agency": "KCA", "Last Minute Booking": "LMB", "Local Price": "LP", "Net Inclusive Rate": "LP", "LanguageLine Support": "LLS", "Market Manager": "MM", "Malay": "MY", "Manual Review Box": "MRB", "Malaysia Tourism Tax": "MTTX", "Net Promoter Score": "NPS", "Negative Commission": "NC", "Natural disaster": "ND", "Non Web Collect": "NWC", "Online Training": "OLT", "Operations": "OPS", "Over Time": "OT", "Office of The Consumer Protection Board": "OCPB", "Original Booking Value": "OBV", "Outlook Email Task": "OET", "Offline Payment": "OTC", "Over The Counter Payment": "OTC", "Payment Card Industry Data Security": "PCI-Compliance", "Priceline": "PCLN", "Predefined Content": "PDC", "Public Holiday": "PH", "Payment Team": "PMT", "Payment": "PMT", "Funds": "PMT", "Proof of Concept": "POC", "Partner Services": "PS", "Portuguese": "PT", "Providence": "PVD", "PCFW": "PCFW", "Private Message": "PM", "Personal Follow up": "PFU", "Questions and Answers": "Q&A", "Quality Assurance": "QA", "Quick Services": "QS", "Rebook": "RB", "Rewards Backoffice": "RBO", "Refund Request Form": "RRF", "Russian": "RU", "Agoda Website Structure": "ROH", "Reclame Aqui": "REAQ", "Real Time Specialist": "RTS", "Sao Paulo": "SAO", "Shift Coordinator": "SC", "Single Contact Resolution": "SCR", "Specially Designated Nationals": "SDN", "Seoul": "SEL", "Singapore": "SG", "Shanghai": "SHG", "Service Level Agreement": "SLA", "Selling Price": "SP", "Self Service Cancellation Fee Waiver": "SSFW", "Smart Service Identification Number": "SSID", "Specialized Support Team": "SST", "SuperAggregator": "SuperAgg", "Social Media": "SM", "Sharepoint Escalation Task": "SPT", "Sprinklr Case For Social Media Team": "SPK", "Terms & Conditions": "T&C", "Travel Agent": "TA", "Turn around time": "TAT", "Team Captain": "TC", "Thai": "TH", "Team Leader": "TL", "Team Manager": "TM", "Travel Operations": "TO", "Touch point": "TP", "Touch point per day": "TPD", "Touch point per hour": "TPH", "Escalation to TM/ TC": "TME", "Taobao Fliggy Chat": "TFC", "TM/TC assignment": "TMA", "TeQuejaSuma": "TQS", "Time to first response": "TTFR", "Unique Purchasing Card": "UPC", "Universal Resource Locator": "URL", "Urgent Last Minute Booking": "URLMB", "Unique Contact ID": "UCID", "Virtual Classroom Training": "VCT", "Vietnamese": "VN", "Voice per hour": "VPH", "Work Force Management": "WFM", "Working Day(s)": "WD", "World Pay": "WP", "World Wide Web": "WWW", "Walk-in Customer": "WIC", "Work Breakdown Structure": "WBS", "Extensible Markup Language": "XML", "Yield Control System": "YCS", "Yokohama": "YOK"
         };
         // ---------------------------------
 
@@ -283,17 +388,22 @@
                 const abbreviation = abbreviationMap[phrase];
                 const listItem = document.createElement('div');
                 
-                let phraseClass = 'text-gray-300 font-medium';
+                let phraseClass = 'font-medium';
+                let abbrClass = 'font-bold text-white dark:text-gray-900'; // Abbreviation text color changes with theme
+
                 // Use monochrome styling for distinction
                 if (typoTerms.includes(phrase)) {
-                    // Typos: Bold, italic, and a bottom border/underline look
-                    phraseClass = 'text-gray-400 font-bold italic border-b border-gray-400';
+                    // Typos: Bold, italic, and a bottom border/underline look (color changes with theme)
+                    phraseClass = 'font-bold italic border-b border-gray-400 dark:border-gray-600 text-gray-400 dark:text-gray-600';
                 } else if (synonymTerms.includes(phrase) || phrase === "Cancel") {
-                    // Synonyms/Related: Stronger italic look
-                    phraseClass = 'text-gray-500 font-bold italic';
+                    // Synonyms/Related: Stronger italic look (color changes with theme)
+                    phraseClass = 'font-bold italic text-gray-500 dark:text-gray-600';
+                } else {
+                    // Standard entries
+                    phraseClass = 'text-gray-300 dark:text-gray-700';
                 }
 
-                listItem.innerHTML = `<span class="${phraseClass}">${phrase}</span> <span class="text-gray-500">→</span> <span class="font-bold text-white">${abbreviation}</span>`;
+                listItem.innerHTML = `<span class="${phraseClass}">${phrase}</span> <span class="text-gray-500 dark:text-gray-400">→</span> <span class="${abbrClass}">${abbreviation}</span>`;
                 abbreviationList.appendChild(listItem);
             });
         }
@@ -493,6 +603,11 @@
         function convertTo(caseType) {
             let text = textInput.value;
 
+            if (getApiKey() === "") {
+                showMessage("AI is inactive. Please paste your key to use the conversion features.", false);
+                return;
+            }
+
             if (caseType === 'abbreviate') {
                 handleAbbreviateConversion(text);
                 return;
@@ -503,12 +618,12 @@
             }
         }
 
-        function clearText() {
+        window.clearText = function() {
             textInput.value = '';
             showMessage('Text input cleared.', true);
         }
 
-        function copyToClipboard() {
+        window.copyToClipboard = function() {
             try {
                 textInput.select();
                 textInput.setSelectionRange(0, 99999); 
@@ -524,15 +639,13 @@
 
         // Expose global functions needed by HTML buttons
         window.convertTo = convertTo;
-        window.clearText = clearText;
-        window.copyToClipboard = copyToClipboard;
 
 
         // --- Initialization ---
         window.onload = () => {
-            // Check the status of the hardcoded key immediately
+            initTheme(); // Initialize theme first
             checkApiKeyStatus(); 
-            renderAbbreviations();
+            renderAbbreviations(); // Renders the list with theme-aware classes
         }; 
     </script>
 </body>
